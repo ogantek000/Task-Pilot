@@ -244,6 +244,43 @@ body {
 .btn-icon-sm:hover { border-color: var(--ink); color: var(--ink); background: var(--bg); }
 .btn-icon-sm.danger:hover { border-color: var(--red); color: var(--red); background: #fff5f5; }
 
+/* ── RANDOM TASK BOX ── */
+.random-task-container {
+  max-width: 680px;
+  background: #fff8e6;
+  border: 2px solid var(--ink);
+  box-shadow: var(--shadow-lg);
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: none;
+  animation: slideIn .25s cubic-bezier(.22,1,.36,1);
+}
+
+.random-task-header {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.random-task-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--muted);
+}
+.random-task-close:hover { color: var(--ink); }
+
+.random-task-body .task-name {
+  margin-bottom: 2px;
+}
+
 /* ── ADD BUTTON ── */
 .btn-add {
   display: flex;
@@ -696,6 +733,9 @@ body {
           <div class="count-num" id="countDisplay">0</div>
           <span class="count-lbl">zadań</span>
         </div>
+        <button class="btn-icon-sm" id="randomTaskBtn" onclick="drawRandomTask()" title="Losuj zadanie">
+          <span style="font-size: 16px; line-height: 1;">🎲</span>
+        </button>
         <button class="btn-icon-sm" id="editListBtn" onclick="openEditListModal()" title="Edytuj listę">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -708,6 +748,15 @@ body {
           </svg>
         </button>
       </div>
+    </div>
+
+    <!-- RANDOM TASK HIGHLIGHT BOX -->
+    <div class="random-task-container" id="randomTaskContainer">
+      <div class="random-task-header">
+        <span>🎲 Wylosowane zadanie</span>
+        <button class="random-task-close" onclick="closeRandomTask()">✕</button>
+      </div>
+      <div class="random-task-body" id="randomTaskContent"></div>
     </div>
 
     <button class="btn-add" id="btnAdd" onclick="openTaskModal()">
@@ -853,6 +902,7 @@ function swipeToList(targetIdx, dir) {
   currentListId = db.lists[targetIdx].id;
   currentFilter = 'active';
   document.querySelectorAll('.filter-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+  closeRandomTask();
   renderAll();
   // trigger animation after render
   requestAnimationFrame(() => {
@@ -933,6 +983,7 @@ function switchList(id) {
   currentFilter = 'active';
   document.querySelectorAll('.filter-btn').forEach((b,i) => b.classList.toggle('active', i===0));
   document.getElementById('sidebar').classList.remove('open');
+  closeRandomTask();
   renderAll();
 }
 
@@ -1027,6 +1078,11 @@ function toggleDone(id) {
   t.done = !t.done;
   t.doneAt = t.done ? new Date().toISOString() : null;
   saveDB();
+  // If the drawn task was completed, close the random box
+  const container = document.getElementById('randomTaskContainer');
+  if (container.style.display === 'block' && t.done) {
+     closeRandomTask();
+  }
   renderAll();
 }
 
@@ -1040,6 +1096,7 @@ function setFilter(f, btn) {
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  closeRandomTask();
   renderTasks();
 }
 
@@ -1050,6 +1107,37 @@ function purgeExpired() {
     Date.now() - new Date(t.doneAt).getTime() < 172800000
   );
   if (db.tasks.length !== before) { saveDB(); renderAll(); }
+}
+
+// ── RANDOM TASK FUNCTIONALITY ──────────────────────────────────────────────
+function drawRandomTask() {
+  const activeTasks = db.tasks.filter(t => t.listId === currentListId && !t.done);
+  const container = document.getElementById('randomTaskContainer');
+  const content = document.getElementById('randomTaskContent');
+  
+  if (activeTasks.length === 0) {
+    alert('Brak aktywnych zadań na tej liście do wylosowania!');
+    container.style.display = 'none';
+    return;
+  }
+  
+  const randomIndex = Math.floor(Math.random() * activeTasks.length);
+  const pickedTask = activeTasks[randomIndex];
+  
+  const tag = deadlineTag(pickedTask.deadline);
+  const tagsRow = tag ? `<div class="task-tags">${tag}</div>` : '';
+  const descRow = pickedTask.desc ? `<div class="task-desc">${pickedTask.desc}</div>` : '';
+  
+  content.innerHTML = `
+    <div class="task-name">${pickedTask.name}</div>
+    ${descRow}${tagsRow}
+  `;
+  
+  container.style.display = 'block';
+}
+
+function closeRandomTask() {
+  document.getElementById('randomTaskContainer').style.display = 'none';
 }
 
 // ── TASK MODAL ────────────────────────────────────────────────────────────
@@ -1208,6 +1296,7 @@ function doDeleteList() {
   currentListId = db.lists[0].id;
   saveDB();
   closeConfirm();
+  closeRandomTask();
   renderAll();
 }
 
